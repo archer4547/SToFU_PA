@@ -6,6 +6,7 @@
 #include <iostream>
 
 auto startup = std::chrono::high_resolution_clock::now();
+int seen_numbers[20];
 
 typedef int(WINAPI* _MessageBoxW) (
 	HWND hWnd,
@@ -45,11 +46,12 @@ int WINAPI hookRandomMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, U
 		random_number = (int)lpText[wstr_iter - 2] - 48; // 48 - "0" char
 	}
 	if (std::isalpha(lpText[wstr_iter - 2])) {
-		std::abort();
+		//std::abort();
 	}
 	else {
 		random_number = random_number * 10 + (int)lpText[wstr_iter - 1] - 48;
 	}
+	seen_numbers[random_number - 1] = 1;
 
 	// main hook part
 	if (random_number == 1) {
@@ -62,20 +64,33 @@ int WINAPI hookRandomMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, U
 
 	// return injected MessageBox
 	return TrueMessageBoxW(hWnd, random_text.c_str(), lpCaption, uType);
+
 }
 
 int wmain(int, WCHAR* []) {
+	for (int i = 0; i < 20; i++) {
+		seen_numbers[i] = 0;
+	}
+
 
 	if (Mhook_SetHook((PVOID*)&TrueMessageBoxW, reinterpret_cast<PVOID>(hookRandomMessageBoxW))) {
 		std::cout << "Hook successfull\n";
 	}
 	
-	while (true) {
+	int s = 0;
+	while (s < 20) {
+		s = 0;
+		for (int i = 0; i < 20; i++) {
+			s += seen_numbers[i];
+		}
 		showRandomMessageBox();
-		Sleep(10);
 	}
 
-	Mhook_Unhook((PVOID*)hookRandomMessageBoxW);
+	if (Mhook_Unhook((PVOID*)&TrueMessageBoxW)) {
+		std::cout << "Unhooked successfully\n";
+	}
+
+	Sleep(5000);
 
 	return 0;
 }
